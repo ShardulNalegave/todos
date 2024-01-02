@@ -5,12 +5,12 @@ import (
 	"gorm.io/gorm"
 )
 
-type SessionModel struct {
+type Session struct {
 	ID     string `gorm:"primaryKey"`
 	UserID string
 }
 
-func (t *SessionModel) BeforeCreate(tx *gorm.DB) (err error) {
+func (t *Session) BeforeCreate(tx *gorm.DB) (err error) {
 	t.ID = uuid.NewString()
 	return
 }

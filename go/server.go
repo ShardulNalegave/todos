@@ -6,7 +6,9 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/ShardulNalegave/todos/go/auth"
 	"github.com/ShardulNalegave/todos/go/database"
+	"github.com/ShardulNalegave/todos/go/routes"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -25,10 +27,10 @@ func main() {
 
 	router := chi.NewRouter()
 	router.Use(database.DatabaseMiddleware(db))
+	router.Use(auth.AuthMiddleware())
 
-	router.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Hello, World!"))
-	})
+	router.Mount("/auth", routes.AuthRoutes())
+	router.Mount("/todos", routes.TodosRoutes())
 
 	log.Printf("Listening at :%s", port)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), router))

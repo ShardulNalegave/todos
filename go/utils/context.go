@@ -5,3 +5,4 @@ type contextKey struct {
 }
 
 var DatabaseKey = &contextKey{name: "DatabaseContextKey"}
+var AuthKey = &contextKey{name: "AuthContextKey"}

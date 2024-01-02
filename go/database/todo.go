@@ -5,14 +5,14 @@ import (
 	"gorm.io/gorm"
 )
 
-type TodoModel struct {
+type Todo struct {
 	ID        string `gorm:"primaryKey" json:"id"`
 	Content   string `json:"content"`
 	Completed bool   `json:"completed"`
 	CreatedBy string `json:"created_by"`
 }
 
-func (t *TodoModel) BeforeCreate(tx *gorm.DB) (err error) {
+func (t *Todo) BeforeCreate(tx *gorm.DB) (err error) {
 	t.ID = uuid.NewString()
 	return
 }
