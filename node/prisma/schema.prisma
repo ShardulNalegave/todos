@@ -11,6 +11,8 @@ datasource db {
 model Session {
   id String @id @default(uuid())
   user_id String
+
+  @@map("sessions")
 }
 
 model User {
@@ -18,6 +20,8 @@ model User {
   name String
   email String
   password_hash String
+
+  @@map("users")
 }
 
 model Todo {
@@ -25,4 +29,6 @@ model Todo {
   content String
   completed Boolean
   created_by String
+
+  @@map("todos")
 }

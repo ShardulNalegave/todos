@@ -11,9 +11,8 @@ import (
 	"gorm.io/gorm"
 )
 
-func TodosRoutes(cors func(http.Handler) http.Handler) *chi.Mux {
+func TodosRoutes() *chi.Mux {
 	router := chi.NewRouter()
-	router.Use(cors)
 	router.Get("/", allTodos)
 	router.Post("/", createTodo)
 	router.Get("/{id}", getTodo)
@@ -139,7 +138,7 @@ func updateTodo(w http.ResponseWriter, r *http.Request) {
 
 	if todo.CreatedBy != state.Session.UserID {
 		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte("User Cannot edit other's todos"))
+		w.Write([]byte("Cannot edit other's todos"))
 		return
 	}
 
@@ -163,6 +162,15 @@ func updateTodo(w http.ResponseWriter, r *http.Request) {
 func deleteTodo(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	db := r.Context().Value(utils.DatabaseKey).(*gorm.DB)
+	state := r.Context().Value(utils.DatabaseKey).(auth.AuthState)
+
+	var todo database.Todo
+	db.First(&todo, "id = ?", id)
+	if todo.CreatedBy != state.Session.UserID {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte("Cannot delete other's todos"))
+		return
+	}
 
 	res := db.Delete(&database.Todo{}, "id = ?", id)
 

@@ -38,8 +38,8 @@ func main() {
 	router.Use(database.DatabaseMiddleware(db))
 	router.Use(auth.AuthMiddleware())
 
-	router.Mount("/auth", routes.AuthRoutes(corsHandler))
-	router.Mount("/todos", routes.TodosRoutes(corsHandler))
+	router.Mount("/auth", routes.AuthRoutes())
+	router.Mount("/todos", routes.TodosRoutes())
 
 	log.Printf("Listening at :%s", port)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), router))
