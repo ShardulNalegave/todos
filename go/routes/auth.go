@@ -10,8 +10,9 @@ import (
 	"gorm.io/gorm"
 )
 
-func AuthRoutes() *chi.Mux {
+func AuthRoutes(cors func(http.Handler) http.Handler) *chi.Mux {
 	router := chi.NewRouter()
+	router.Use(cors)
 	router.Post("/create", createUser)
 	router.Post("/login", login)
 	router.Post("/logout", logout)

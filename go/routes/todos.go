@@ -11,8 +11,9 @@ import (
 	"gorm.io/gorm"
 )
 
-func TodosRoutes() *chi.Mux {
+func TodosRoutes(cors func(http.Handler) http.Handler) *chi.Mux {
 	router := chi.NewRouter()
+	router.Use(cors)
 	router.Get("/", allTodos)
 	router.Post("/", createTodo)
 	router.Get("/{id}", getTodo)
@@ -23,9 +24,16 @@ func TodosRoutes() *chi.Mux {
 
 func allTodos(w http.ResponseWriter, r *http.Request) {
 	db := r.Context().Value(utils.DatabaseKey).(*gorm.DB)
+	state := r.Context().Value(utils.AuthKey).(auth.AuthState)
+
+	if !state.IsAuth {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte("User unauthenticated"))
+		return
+	}
 
 	var todos []database.Todo
-	if err := db.Find(&todos).Error; err != nil {
+	if err := db.Find(&todos, "created_by = ?", state.Session.UserID).Error; err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Could not read data"))
 		return
@@ -46,9 +54,16 @@ func allTodos(w http.ResponseWriter, r *http.Request) {
 func getTodo(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	db := r.Context().Value(utils.DatabaseKey).(*gorm.DB)
+	state := r.Context().Value(utils.AuthKey).(auth.AuthState)
+
+	if !state.IsAuth {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte("User unauthenticated"))
+		return
+	}
 
 	var todo database.Todo
-	res := db.First(&todo, "id = ?", id)
+	res := db.First(&todo, "id = ? AND created_by = ?", id, state.Session.UserID)
 
 	if res.Error != nil {
 		w.WriteHeader(http.StatusNotFound)

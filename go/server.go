@@ -10,6 +10,7 @@ import (
 	"github.com/ShardulNalegave/todos/go/database"
 	"github.com/ShardulNalegave/todos/go/routes"
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/cors"
 )
 
 const defaultPort = "5000"
@@ -25,12 +26,20 @@ func main() {
 		log.Fatalf("Could not connect to db")
 	}
 
+	corsHandler := cors.Handler(cors.Options{
+		AllowedOrigins:   []string{"https://*", "http://*"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowCredentials: true,
+	})
+
 	router := chi.NewRouter()
+	router.Use(corsHandler)
+
 	router.Use(database.DatabaseMiddleware(db))
 	router.Use(auth.AuthMiddleware())
 
-	router.Mount("/auth", routes.AuthRoutes())
-	router.Mount("/todos", routes.TodosRoutes())
+	router.Mount("/auth", routes.AuthRoutes(corsHandler))
+	router.Mount("/todos", routes.TodosRoutes(corsHandler))
 
 	log.Printf("Listening at :%s", port)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), router))
