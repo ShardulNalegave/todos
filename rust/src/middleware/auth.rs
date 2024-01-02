@@ -10,28 +10,27 @@ use tower_cookies::Cookies;
 use crate::{context::Context, auth::{AUTH_SESSION_COOKIE, AuthState}};
 // ===================
 
-
 pub async fn auth_middleware(
-  State(mut state): State<Context>,
+  State(state): State<Context>,
   cookies: Cookies,
-  request: Request,
+  mut request: Request,
   next: Next,
 ) -> Response {
   let session_cookie = cookies.get(AUTH_SESSION_COOKIE);
   match session_cookie {
-    Some(session_cookie) => match entity::user::Entity::find_by_id(session_cookie.value()).one(&state.db).await {
-      Ok(user) => match user {
-        Some(user) => {
-          state.auth_state = Some(AuthState {
+    Some(session_cookie) => match entity::session::Entity::find_by_id(session_cookie.value()).one(&state.db).await {
+      Ok(session) => match session {
+        Some(session) => {
+          request.extensions_mut().insert(AuthState {
             session_id: session_cookie.value().to_owned(),
-            user_id: user.id,
+            user_id: session.user_id,
           });
         },
-        None => state.auth_state = None,
+        None => {},
       },
-      Err(_) => state.auth_state = None,
+      Err(_) => {},
     },
-    None => state.auth_state = None,
+    None => {},
   }
 
   next.run(request).await

@@ -8,7 +8,7 @@ pub mod routes;
 use anyhow::Result;
 use axum::{
   Router,
-  routing::get,
+  routing::post,
 };
 use migration::{Migrator, MigratorTrait};
 use sea_orm::{DatabaseConnection, Database};
@@ -22,10 +22,12 @@ async fn main() -> Result<()> {
   let db: DatabaseConnection = Database::connect("sqlite://todos.sqlite?mode=rwc").await?;
   Migrator::up(&db, None).await?;
 
-  let ctx = context::Context { db, auth_state: None };
+  let ctx = context::Context { db };
 
   let app = Router::new()
-    .route("/", get(root))
+    .route("/auth/logout", post(routes::auth::logout))
+    .route("/auth/create", post(routes::auth::create_user))
+    .route("/auth/login", post(routes::auth::login))
     .route_layer(axum::middleware::from_fn_with_state(ctx.clone(), middleware::auth_middleware))
     .layer(CookieManagerLayer::new())
     .with_state(ctx);
@@ -35,8 +37,4 @@ async fn main() -> Result<()> {
   axum::serve(listener, app).await?;
 
   Ok(())
-}
-
-async fn root() -> &'static str {
-  "Hello, World!"
 }

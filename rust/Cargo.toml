@@ -4,13 +4,17 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-axum = "0.7"
 anyhow = "1"
+bcrypt = "0.15"
 serde = "1"
 serde_json = "1"
 tower-cookies = "0.10"
 entity = { path = "entity" }
 migration = { path = "migration" }
+
+[dependencies.axum]
+version = "0.7"
+features = ["json"]
 
 [dependencies.uuid]
 version = "1"
