@@ -3,7 +3,7 @@
 use axum::{extract::State, extract::Json, http::StatusCode, Extension};
 use serde_json::{Value, json};
 use tower_cookies::{Cookies, Cookie};
-use crate::{context::Context, auth::{self, AUTH_SESSION_COOKIE}};
+use crate::{context::Context, auth::{self, AUTH_SESSION_COOKIE, AuthState}};
 // ====================
 
 pub async fn login(
@@ -69,26 +69,32 @@ pub async fn logout(
   cookies: Cookies,
   Extension(auth_state): Extension<auth::AuthState>,
 ) -> (StatusCode, Json<Value>) {
-  match auth::logout(&context.db, auth_state.session_id.clone()).await {
-    Err(_) => (
-      StatusCode::INTERNAL_SERVER_ERROR,
-      Json(json!({
-        "message": "Could not log out"
-      })),
+  match auth_state {
+    AuthState::Unauthenticated => (
+      StatusCode::UNAUTHORIZED,
+      Json(json!({ "message": "Not logged in" })),
     ),
-    Ok(_) =>  {
-      cookies.remove(
-        Cookie::build(AUTH_SESSION_COOKIE)
-          .path("/")
-          .http_only(true)
-          .build(),
-      );
-      (
-        StatusCode::OK,
+    AuthState::Authenticated(auth_data) => match auth::logout(&context.db, auth_data.session_id.clone()).await {
+      Err(_) => (
+        StatusCode::INTERNAL_SERVER_ERROR,
         Json(json!({
-          "message": "Done"
+          "message": "Could not log out"
         })),
-      )
+      ),
+      Ok(_) =>  {
+        cookies.remove(
+          Cookie::build(AUTH_SESSION_COOKIE)
+            .path("/")
+            .http_only(true)
+            .build(),
+        );
+        (
+          StatusCode::OK,
+          Json(json!({
+            "message": "Done"
+          })),
+        )
+      },
     },
   }
 }

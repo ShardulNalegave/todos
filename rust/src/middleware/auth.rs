@@ -7,7 +7,7 @@ use axum::{
 };
 use sea_orm::EntityTrait;
 use tower_cookies::Cookies;
-use crate::{context::Context, auth::{AUTH_SESSION_COOKIE, AuthState}};
+use crate::{context::Context, auth::{AUTH_SESSION_COOKIE, AuthState, AuthData}};
 // ===================
 
 pub async fn auth_middleware(
@@ -21,16 +21,16 @@ pub async fn auth_middleware(
     Some(session_cookie) => match entity::session::Entity::find_by_id(session_cookie.value()).one(&state.db).await {
       Ok(session) => match session {
         Some(session) => {
-          request.extensions_mut().insert(AuthState {
+          request.extensions_mut().insert(AuthState::Authenticated(AuthData{
             session_id: session_cookie.value().to_owned(),
             user_id: session.user_id,
-          });
+          }));
         },
-        None => {},
+        None => { request.extensions_mut().insert(AuthState::Unauthenticated); },
       },
-      Err(_) => {},
+      Err(_) => { request.extensions_mut().insert(AuthState::Unauthenticated); },
     },
-    None => {},
+    None => { request.extensions_mut().insert(AuthState::Unauthenticated); },
   }
 
   next.run(request).await

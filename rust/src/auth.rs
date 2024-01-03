@@ -9,6 +9,6 @@ mod logout;
 pub use logout::logout;
 
 mod state;
-pub use state::AuthState;
+pub use state::{AuthState, AuthData};
 
 pub const AUTH_SESSION_COOKIE: &str = "auth-session";
