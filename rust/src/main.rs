@@ -28,8 +28,8 @@ async fn main() -> Result<()> {
     .route("/auth/logout", post(routes::auth::logout))
     .route("/auth/create", post(routes::auth::create_user))
     .route("/auth/login", post(routes::auth::login))
-    .route("/todos", get(routes::todos::todos))
-    .route("/todo/:id", get(routes::todos::todo))
+    .route("/todos", get(routes::todos::todos).post(routes::todos::create_todo))
+    .route("/todos/:id", get(routes::todos::todo).delete(routes::todos::delete_todo).put(routes::todos::update_todo))
     .route_layer(axum::middleware::from_fn_with_state(ctx.clone(), middleware::auth_middleware))
     .layer(CookieManagerLayer::new())
     .with_state(ctx);

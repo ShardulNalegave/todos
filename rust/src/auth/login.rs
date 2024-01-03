@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use sea_orm::{DatabaseConnection, EntityTrait, QueryFilter, Set, ColumnTrait};
 use serde::{Serialize, Deserialize};
 
@@ -12,8 +12,11 @@ pub struct LoginPayload {
 pub async fn login(db: &DatabaseConnection, user: LoginPayload) -> Result<(String, String)> {
   let user = entity::user::Entity::find()
     .filter(entity::user::Column::Email.eq(user.email.clone()))
-    .one(db).await?
-    .expect("No such user exists");
+    .one(db).await?;
+  if user.is_none() {
+    return Err(anyhow!("User does not exist"));
+  }
+  let user = user.unwrap();
 
   let session_id = uuid::Uuid::new_v4().to_string();
   let session_doc = entity::session::ActiveModel {
