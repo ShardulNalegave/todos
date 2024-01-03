@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/cors"
 )
 
+// Default port for backend
 const defaultPort = "5000"
 
 func main() {
@@ -28,7 +29,6 @@ func main() {
 
 	corsHandler := cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"https://*", "http://*"},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowCredentials: true,
 	})
 

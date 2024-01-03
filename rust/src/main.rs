@@ -17,7 +17,8 @@ use tower_cookies::CookieManagerLayer;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-  let port = std::env::var("PORT").unwrap_or("5000".to_owned());
+  let port = std::env::var("PORT")
+    .unwrap_or("5000".to_owned());
 
   let db: DatabaseConnection = Database::connect("sqlite://todos.sqlite?mode=rwc").await?;
   Migrator::up(&db, None).await?;
@@ -25,13 +26,22 @@ async fn main() -> Result<()> {
   let ctx = context::Context { db };
 
   let app = Router::new()
+
+    // Auth routes
+    .route("/auth/user", get(routes::auth::current_user))
     .route("/auth/logout", post(routes::auth::logout))
     .route("/auth/create", post(routes::auth::create_user))
     .route("/auth/login", post(routes::auth::login))
+
+    // Todos routes
     .route("/todos", get(routes::todos::todos).post(routes::todos::create_todo))
     .route("/todos/:id", get(routes::todos::todo).delete(routes::todos::delete_todo).put(routes::todos::update_todo))
+
+    // Middlewares
     .route_layer(axum::middleware::from_fn_with_state(ctx.clone(), middleware::auth_middleware))
     .layer(CookieManagerLayer::new())
+
+    // State
     .with_state(ctx);
 
   println!("Listening at :{}", port);

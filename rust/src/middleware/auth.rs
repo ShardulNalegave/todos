@@ -16,21 +16,25 @@ pub async fn auth_middleware(
   mut request: Request,
   next: Next,
 ) -> Response {
-  let session_cookie = cookies.get(AUTH_SESSION_COOKIE);
-  match session_cookie {
-    Some(session_cookie) => match entity::session::Entity::find_by_id(session_cookie.value()).one(&state.db).await {
-      Ok(session) => match session {
-        Some(session) => {
-          request.extensions_mut().insert(AuthState::Authenticated(AuthData{
-            session_id: session_cookie.value().to_owned(),
-            user_id: session.user_id,
-          }));
-        },
-        None => { request.extensions_mut().insert(AuthState::Unauthenticated); },
-      },
-      Err(_) => { request.extensions_mut().insert(AuthState::Unauthenticated); },
+  let session_cookie = match cookies.get(AUTH_SESSION_COOKIE) {
+    None => {
+      request.extensions_mut().insert(AuthState::Unauthenticated);
+      return next.run(request).await
     },
-    None => { request.extensions_mut().insert(AuthState::Unauthenticated); },
+    Some(session_cookie) => session_cookie,
+  };
+
+  match entity::session::Entity::find_by_id(session_cookie.value()).one(&state.db).await {
+    Err(_) => { request.extensions_mut().insert(AuthState::Unauthenticated); },
+    Ok(session) => match session {
+      None => { request.extensions_mut().insert(AuthState::Unauthenticated); },
+      Some(session) => {
+        request.extensions_mut().insert(AuthState::Authenticated(AuthData{
+          session_id: session_cookie.value().to_owned(),
+          user_id: session.user_id,
+        }));
+      },
+    },
   }
 
   next.run(request).await

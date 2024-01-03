@@ -1,12 +1,13 @@
 
 // ===== Imports =====
 use axum::{extract::{State, Path}, extract::Json, http::StatusCode, Extension};
-use sea_orm::{EntityTrait, QueryFilter, ColumnTrait, Set, ActiveModelTrait};
+use sea_orm::{EntityTrait, QueryFilter, ColumnTrait, Set, ActiveModelTrait, TryIntoModel};
 use serde::{Serialize, Deserialize};
 use serde_json::{Value, json};
 use crate::{context::Context, auth::AuthState};
 // ===================
 
+// GET - Returns all todos by current user
 pub async fn todos(
   State(context): State<Context>,
   Extension(auth_state): Extension<AuthState>,
@@ -36,6 +37,7 @@ pub async fn todos(
   }
 }
 
+// GET - Return Todo with given ID created by current user
 pub async fn todo(
   State(context): State<Context>,
   Path(todo_id): Path<String>,
@@ -69,6 +71,7 @@ pub async fn todo(
   }
 } 
 
+// DELETE - Deletes Todo with given ID if created by current user
 pub async fn delete_todo(
   State(context): State<Context>,
   Path(todo_id): Path<String>,
@@ -100,6 +103,7 @@ pub async fn delete_todo(
   }
 }
 
+// POST - Creates a new Todo
 pub async fn create_todo(
   State(context): State<Context>,
   Extension(auth_state): Extension<AuthState>,
@@ -115,7 +119,7 @@ pub async fn create_todo(
       let todo = entity::todo::ActiveModel {
         id: Set(todo_id.clone()),
         content: Set(payload.content),
-        completed: Set(payload.completed),
+        completed: Set(false),
         created_by: Set(auth_data.user_id.clone()),
       };
 
@@ -125,30 +129,19 @@ pub async fn create_todo(
           Json(json!({ "message": "Could not create todo" })),
         ),
         Ok(_) => {
-          let todos_res = entity::todo::Entity::find_by_id(todo_id)
-            .filter(entity::todo::Column::CreatedBy.eq(auth_data.user_id))
+          let todo = entity::todo::Entity::find_by_id(todo_id)
             .into_json()
-            .one(&context.db).await;
-
-          match todos_res {
-            Err(err) => (
-              StatusCode::INTERNAL_SERVER_ERROR,
-              Json(json!({ "message": err.to_string() })),
-            ),
-            Ok(todo_option) => match todo_option {
-              None => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "message": "Something went wrong" }))),
-              Some(todo) => (
-                StatusCode::OK,
-                Json(serde_json::to_value(todo).unwrap()),
-              ),
-            },
-          }
+            .one(&context.db).await
+            .unwrap().unwrap();
+          
+          (StatusCode::OK, Json(todo))
         },
       }
     },
   }
 }
 
+// PUT - Updates Todo with given ID if created by current user
 pub async fn update_todo(
   State(context): State<Context>,
   Path(todo_id): Path<String>,
@@ -179,25 +172,17 @@ pub async fn update_todo(
               StatusCode::INTERNAL_SERVER_ERROR,
               Json(json!({ "message": err.to_string() })),
             ),
-            Ok(_) => {
-              let todos_res = entity::todo::Entity::find_by_id(todo_id)
-                .filter(entity::todo::Column::CreatedBy.eq(auth_data.user_id))
-                .into_json()
-                .one(&context.db).await;
-
-              match todos_res {
-                Err(err) => (
-                  StatusCode::INTERNAL_SERVER_ERROR,
-                  Json(json!({ "message": err.to_string() })),
-                ),
-                Ok(todo_option) => match todo_option {
-                  None => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "message": "Something went wrong" }))),
-                  Some(todo) => (
-                    StatusCode::OK,
-                    Json(serde_json::to_value(todo).unwrap()),
-                  ),
-                },
-              }
+            Ok(todo) => {
+              let todo = todo.try_into_model().unwrap();
+              (
+                StatusCode::OK,
+                Json(json!({
+                  "id": todo.id,
+                  "content": todo.content,
+                  "completed": todo.completed,
+                  "created_by": todo.created_by,
+                })),
+              )
             },
           }
         },
@@ -209,7 +194,6 @@ pub async fn update_todo(
 #[derive(Serialize, Deserialize)]
 pub struct CreateTodoPayload {
   pub content: String,
-  pub completed: bool,
 }
 
 #[derive(Serialize, Deserialize)]

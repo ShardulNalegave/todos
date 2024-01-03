@@ -11,6 +11,7 @@ import (
 	"gorm.io/gorm"
 )
 
+// Creates a new router with all todo routes registered
 func TodosRoutes() *chi.Mux {
 	router := chi.NewRouter()
 	router.Get("/", allTodos)
@@ -21,43 +22,39 @@ func TodosRoutes() *chi.Mux {
 	return router
 }
 
+// GET - Returns all todos of the currently logged in user
 func allTodos(w http.ResponseWriter, r *http.Request) {
 	db := r.Context().Value(utils.DatabaseKey).(*gorm.DB)
 	state := r.Context().Value(utils.AuthKey).(auth.AuthState)
 
 	if !state.IsAuth {
-		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte("User unauthenticated"))
+		ResponseData{
+			Message: "User not logged in",
+		}.Write(&w, http.StatusUnauthorized)
 		return
 	}
 
 	var todos []database.Todo
 	if err := db.Find(&todos, "created_by = ?", state.Session.UserID).Error; err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Could not read data"))
+		ResponseData{
+			Message: "Could not read data",
+		}.Write(&w, http.StatusInternalServerError)
 		return
 	}
 
-	todosJSON, err := json.Marshal(todos)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Could not parse data"))
-		return
-	}
-
-	w.Header().Set("Content-Type", "text/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(todosJSON)
+	WriteJSON(http.StatusOK, &w, todos)
 }
 
+// GET - Returns Todo with given ID if created by currently logged in user
 func getTodo(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	db := r.Context().Value(utils.DatabaseKey).(*gorm.DB)
 	state := r.Context().Value(utils.AuthKey).(auth.AuthState)
 
 	if !state.IsAuth {
-		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte("User unauthenticated"))
+		ResponseData{
+			Message: "User not logged in",
+		}.Write(&w, http.StatusUnauthorized)
 		return
 	}
 
@@ -65,128 +62,111 @@ func getTodo(w http.ResponseWriter, r *http.Request) {
 	res := db.First(&todo, "id = ? AND created_by = ?", id, state.Session.UserID)
 
 	if res.Error != nil {
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte("Not found"))
+		ResponseData{
+			Message: "Todo not found",
+		}.Write(&w, http.StatusNotFound)
 		return
 	}
 
-	data, err := json.Marshal(todo)
-	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte("Not found"))
-		return
-	}
-
-	w.Header().Set("Content-Type", "text/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(data)
+	WriteJSON(http.StatusOK, &w, todo)
 }
 
+// POST - Creates a new Todo
 func createTodo(w http.ResponseWriter, r *http.Request) {
 	db := r.Context().Value(utils.DatabaseKey).(*gorm.DB)
 	state := r.Context().Value(utils.AuthKey).(auth.AuthState)
 
 	var data CreateTodoBody
 	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Invalid Data Provided"))
+		ResponseData{
+			Message: "Invalid Data Provided",
+		}.Write(&w, http.StatusBadRequest)
 		return
 	}
 
 	if !state.IsAuth {
-		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte("User unauthenticated"))
+		ResponseData{
+			Message: "User not logged in",
+		}.Write(&w, http.StatusUnauthorized)
 		return
 	}
 
 	todo := database.Todo{
 		Content:   data.Content,
-		Completed: data.Completed,
+		Completed: false,
 		CreatedBy: state.Session.UserID,
 	}
 	db.Create(&todo)
 
-	todoJSON, err := json.Marshal(todo)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Could not parse todo"))
-		return
-	}
-
-	w.Header().Set("Content-Type", "text/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(todoJSON)
+	WriteJSON(http.StatusOK, &w, todo)
 }
 
+// PUT - Updates Todo with given ID if created by the current user
 func updateTodo(w http.ResponseWriter, r *http.Request) {
 	db := r.Context().Value(utils.DatabaseKey).(*gorm.DB)
 	state := r.Context().Value(utils.AuthKey).(auth.AuthState)
 
 	var data UpdateTodoBody
 	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Invalid Data Provided"))
+		ResponseData{
+			Message: "Invalid Data Provided",
+		}.Write(&w, http.StatusBadRequest)
 		return
 	}
 
 	var todo database.Todo
 	if err := db.First(&todo).Error; err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Todo doesn't exist"))
+		ResponseData{
+			Message: "Todo doesn't exist",
+		}.Write(&w, http.StatusBadRequest)
 		return
 	}
 
 	if todo.CreatedBy != state.Session.UserID {
-		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte("Cannot edit other's todos"))
+		ResponseData{
+			Message: "Cannot edit other's todos",
+		}.Write(&w, http.StatusUnauthorized)
 		return
 	}
 
 	todo.Completed = data.Completed
 	todo.Content = data.Content
-
 	db.Save(&todo)
 
-	todoJSON, err := json.Marshal(todo)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Could not parse todo"))
-		return
-	}
-
-	w.Header().Set("Content-Type", "text/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(todoJSON)
+	WriteJSON(http.StatusOK, &w, todo)
 }
 
+// DELETE - Deletes todo with given ID if created by current user
 func deleteTodo(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	db := r.Context().Value(utils.DatabaseKey).(*gorm.DB)
-	state := r.Context().Value(utils.DatabaseKey).(auth.AuthState)
+	state := r.Context().Value(utils.AuthKey).(auth.AuthState)
 
 	var todo database.Todo
 	db.First(&todo, "id = ?", id)
 	if todo.CreatedBy != state.Session.UserID {
-		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte("Cannot delete other's todos"))
+		ResponseData{
+			Message: "Cannot delete other's todos",
+		}.Write(&w, http.StatusUnauthorized)
 		return
 	}
 
 	res := db.Delete(&database.Todo{}, "id = ?", id)
 
 	if res.Error != nil {
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte("Not found"))
+		ResponseData{
+			Message: "Todo not found",
+		}.Write(&w, http.StatusNotFound)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Done"))
+	ResponseData{
+		Message: "Done",
+	}.Write(&w, http.StatusOK)
 }
 
 type CreateTodoBody struct {
-	Content   string `json:"content"`
-	Completed bool   `json:"completed"`
+	Content string `json:"content"`
 }
 
 type UpdateTodoBody struct {
